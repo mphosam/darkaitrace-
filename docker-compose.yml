@@ -1,0 +1,61 @@
+services:
+  tor-service:
+    image: osminogin/tor-simple
+    container_name: tor-service
+    restart: always
+    expose:
+      - "9050"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "echo | nc -w2 127.0.0.1 9050 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  sentinel-ai:
+    build: ./sentinel
+    container_name: sentinel-ai
+    depends_on:
+      tor-service:
+        condition: service_healthy
+    restart: "no"
+    ports:
+      - "5000:5000"   # Web dashboard
+    volumes:
+      - ./sentinel/data:/app/data
+      - model-cache-hf:/home/appuser/.cache/huggingface
+      - model-cache-ocr:/home/appuser/.EasyOCR
+    shm_size: "2gb"
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    environment:
+      TOR_PROXY: socks5://tor-service:9050
+      SEED_URL: "http://juhanurmihxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion"
+      MAX_DEPTH: "0"
+      MAX_SITES: "0"
+      CRAWL_DELAY: "5"
+      # ── Feature toggles (all ON by default) ──
+      ENABLE_LEAK_DETECTION: "true"
+      ENABLE_KEYWORD_MONITOR: "true"
+      ENABLE_CHANGE_DETECTION: "true"
+      ENABLE_FINGERPRINT_ROTATION: "true"
+      ENABLE_API: "true"
+      API_PORT: "5000"
+      # ── Alert webhooks (optional — uncomment to enable) ──
+      # DISCORD_WEBHOOK: "https://discord.com/api/webhooks/YOUR/WEBHOOK"
+      # SLACK_WEBHOOK: "https://hooks.slack.com/services/YOUR/WEBHOOK"
+      # SMTP_HOST: "smtp.gmail.com"
+      # SMTP_PORT: "587"
+      # SMTP_USER: "you@gmail.com"
+      # SMTP_PASS: "app-password"
+      # ALERT_EMAIL_TO: "alerts@example.com"
+
+volumes:
+  model-cache-hf:
+  model-cache-ocr:
